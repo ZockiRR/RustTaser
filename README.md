@@ -2,7 +2,7 @@
 Plugin for Rust servers that allows players with permissions to spawn a taser.
 
 ## Chat Commands
-### Give Taser
+### GiveTaser
 
 ```
 /givetaser [optional:playername]
