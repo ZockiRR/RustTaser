@@ -1,3 +1,6 @@
+## How It Works
+The taser has one charge. After using that charge the taser needs a specific amount of time to recharge. If a player in range is hit by the taser he immediatly gets into the wounded state and will get back up again after a specific amount of time or when another player helps him in the normal way. Unless the taser damage is changed to something > 0, the taser is unable to kill a player. 
+
 ## Chat Commands
 ### GiveTaser
 
