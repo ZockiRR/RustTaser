@@ -7,7 +7,7 @@ Example: /givetaser ZockiRR
 ```
 
 #### Syntax - Options
- - **playername** - The player which will get the taser (default: yourself)
+ - **playername** - The player who will get the taser (default: yourself)
 
 ## Permissions
  - taser.givetaser
