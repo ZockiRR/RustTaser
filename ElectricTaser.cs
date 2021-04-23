@@ -5,13 +5,13 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Taser", "ZockiRR", "1.0.1")]
+    [Info("ElectricTaser", "ZockiRR", "1.0.2")]
     [Description("Gives players the ability to spawn a taser")]
-    class Taser : RustPlugin
+    class ElectricTaser : RustPlugin
     {
 
         #region variables
-        private const string PERMISSION_GIVETASER = "taser.givetaser";
+        private const string PERMISSION_GIVETASER = "electrictaser.givetaser";
         #endregion variables
 
         #region Configuration
