@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Taser", "ZockiRR", "1.0.0")]
+    [Info("Taser", "ZockiRR", "1.0.1")]
     [Description("Gives players the ability to spawn a taser")]
     class Taser : RustPlugin
     {
@@ -143,7 +143,7 @@ namespace Oxide.Plugins
 
         private void Unload()
         {
-            foreach (BaseProjectile eachProjectile in UnityEngine.Object.FindObjectsOfType<BaseProjectile>())
+            foreach (BaseProjectile eachProjectile in BaseNetworkable.serverEntities.OfType<BaseProjectile>())
             {
                 TaserController theController = eachProjectile.GetComponent<TaserController>();
                 if (theController)
@@ -156,7 +156,7 @@ namespace Oxide.Plugins
                 }
             }
 
-            foreach (BasePlayer eachProjectile in UnityEngine.Object.FindObjectsOfType<BasePlayer>())
+            foreach (BasePlayer eachProjectile in BaseNetworkable.serverEntities.OfType<BasePlayer>())
             {
                 UnityEngine.Object.Destroy(eachProjectile.GetComponent<ShockedController>());
             }
