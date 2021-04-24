@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ElectricTaser", "ZockiRR", "1.0.2")]
+    [Info("Electric Taser", "ZockiRR", "1.0.3")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : RustPlugin
     {
