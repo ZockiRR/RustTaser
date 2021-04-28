@@ -1,11 +1,12 @@
 ﻿using Newtonsoft.Json;
+using Oxide.Core;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "1.0.3")]
+    [Info("Electric Taser", "ZockiRR", "1.0.4")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : RustPlugin
     {
@@ -14,8 +15,15 @@ namespace Oxide.Plugins
         private const string PERMISSION_GIVETASER = "electrictaser.givetaser";
         #endregion variables
 
-        #region Configuration
+        #region Data
+        private class DataContainer
+        {
+            // Set Nailgun.net.ID
+            public HashSet<uint> NailgunIDs = new HashSet<uint>();
+        }
+        #endregion Data
 
+        #region Configuration
         private Configuration config;
 
         private class Configuration
@@ -106,7 +114,7 @@ namespace Oxide.Plugins
             }
 
             BasePlayer thePlayer = someArgs.Length > 0 ? FindPlayerByName(aPlayer, someArgs[0]) : aPlayer;
-            if(!thePlayer)
+            if (!thePlayer)
             {
                 return;
             }
@@ -115,15 +123,9 @@ namespace Oxide.Plugins
             {
                 aPlayer.ChatMessage(Lang("CouldNotGive", aPlayer.UserIDString));
                 return;
-                
+
             }
-            BaseProjectile theTaser = theItem.GetHeldEntity().GetComponent<BaseProjectile>();
-            theItem.name = Lang("Taser");
-            theTaser.canUnloadAmmo = false;
-            theTaser.primaryMagazine.contents = 1;
-            theTaser.primaryMagazine.capacity = 0;
-            theTaser.gameObject.AddComponent<TaserController>().Config = config;
-            theTaser.SendNetworkUpdateImmediate();
+            EnableTaserBehaviour(theItem.GetHeldEntity().GetComponent<BaseProjectile>());
             if (thePlayer == aPlayer)
             {
                 aPlayer.ChatMessage(Lang("GaveTaserToYou", aPlayer.UserIDString));
@@ -136,29 +138,55 @@ namespace Oxide.Plugins
         #endregion chatommands
 
         #region hooks
-        private void Init()
-        {
-            permission.RegisterPermission(PERMISSION_GIVETASER, this);
-        }
-
         private void Unload()
         {
+            OnServerSave();
+
             foreach (BaseProjectile eachProjectile in BaseNetworkable.serverEntities.OfType<BaseProjectile>())
             {
-                TaserController theController = eachProjectile.GetComponent<TaserController>();
-                if (theController)
+                if (eachProjectile.GetComponent<TaserController>())
                 {
-                    eachProjectile.GetItem()?.Remove();
-                    if (!eachProjectile.IsDestroyed)
-                    {
-                        eachProjectile.Kill();
-                    }
+                    DisableTaserBehaviour(eachProjectile);
                 }
             }
 
             foreach (BasePlayer eachProjectile in BaseNetworkable.serverEntities.OfType<BasePlayer>())
             {
-                UnityEngine.Object.Destroy(eachProjectile.GetComponent<ShockedController>());
+                ShockedController theController = eachProjectile.GetComponent<ShockedController>();
+                if (theController)
+                {
+                    UnityEngine.Object.Destroy(theController);
+                }
+            }
+        }
+
+        private void OnServerSave()
+        {
+            DataContainer thePersistentData = new DataContainer();
+            foreach (BaseProjectile eachTaser in BaseNetworkable.serverEntities.OfType<BaseProjectile>())
+            {
+                TaserController theController = eachTaser.GetComponent<TaserController>();
+                if (theController)
+                {
+                    thePersistentData.NailgunIDs.Add(eachTaser.net.ID);
+                }
+            }
+            Interface.Oxide.DataFileSystem.WriteObject(Name, thePersistentData);
+        }
+
+        private void OnServerInitialized(bool anInitialFlag)
+        {
+            permission.RegisterPermission(PERMISSION_GIVETASER, this);
+
+            // Readd Behaviour
+            DataContainer thePersistentData = Interface.Oxide.DataFileSystem.ReadObject<DataContainer>(Name);
+            foreach (uint eachNailgunID in thePersistentData.NailgunIDs)
+            {
+                BaseProjectile theTaser = BaseNetworkable.serverEntities.Find(eachNailgunID).GetComponent<BaseProjectile>();
+                if (theTaser)
+                {
+                    EnableTaserBehaviour(theTaser);
+                }
             }
         }
 
@@ -207,6 +235,22 @@ namespace Oxide.Plugins
             return null;
         }
 
+        private void OnItemDropped(Item anItem, BaseEntity aWorldEntity)
+        {
+            if (anItem.GetHeldEntity()?.GetComponent<TaserController>())
+            {
+                anItem.name = null;
+            }
+        }
+
+        private object OnItemPickup(Item anItem, BasePlayer aPlayer)
+        {
+            if (anItem.GetHeldEntity()?.GetComponent<TaserController>())
+            {
+                anItem.name = Lang("Taser");
+            }
+            return null;
+        }
         #endregion hooks
 
         #region methods
@@ -223,6 +267,43 @@ namespace Oxide.Plugins
                 return null;
             }
             return theItem;
+        }
+
+        private void EnableTaserBehaviour(BaseProjectile aBaseProjectile)
+        {
+            Item theItem = aBaseProjectile.GetItem();
+            if (theItem != null)
+            {
+                theItem.name = Lang("Taser");
+            }
+            aBaseProjectile.canUnloadAmmo = false;
+            aBaseProjectile.primaryMagazine.contents = 1;
+            aBaseProjectile.primaryMagazine.capacity = 0;
+            TaserController theController = aBaseProjectile.GetComponent<TaserController>();
+            if (theController)
+            {
+                UnityEngine.Object.Destroy(theController);
+            }
+            aBaseProjectile.gameObject.AddComponent<TaserController>().Config = config;
+            aBaseProjectile.SendNetworkUpdateImmediate();
+        }
+
+        private void DisableTaserBehaviour(BaseProjectile aBaseProjectile)
+        {
+            Item theItem = aBaseProjectile.GetItem();
+            if (theItem != null)
+            {
+                theItem.name = null;
+            }
+            aBaseProjectile.canUnloadAmmo = true;
+            aBaseProjectile.primaryMagazine.contents = 0;
+            aBaseProjectile.primaryMagazine.capacity = 16;
+            TaserController theController = aBaseProjectile.GetComponent<TaserController>();
+            if (theController)
+            {
+                UnityEngine.Object.Destroy(theController);
+            }
+            aBaseProjectile.SendNetworkUpdateImmediate();
         }
         #endregion methods
 
