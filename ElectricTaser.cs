@@ -1,18 +1,27 @@
 ﻿using Newtonsoft.Json;
 using Oxide.Core;
+using Oxide.Core.Libraries.Covalence;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "1.0.4")]
+    [Info("Electric Taser", "ZockiRR", "2.0.0")]
     [Description("Gives players the ability to spawn a taser")]
-    class ElectricTaser : RustPlugin
+    class ElectricTaser : CovalencePlugin
     {
 
         #region variables
         private const string PERMISSION_GIVETASER = "electrictaser.givetaser";
+
+        private const string I18N_NO_PLAYER_FOR_NAME = "NoPlayerForName";
+        private const string I18N_MULTIPLE_PLAYERS_FOR_NAME = "MultiplePlayersForName";
+        private const string I18N_GAVE_TASER_TO = "GaveTaserTo";
+        private const string I18N_GAVE_TASER_TO_YOU = "GaveTaserToYou";
+        private const string I18N_COULD_NOT_SPAWN = "CouldNotSpawn";
+        private const string I18N_TASER = "Taser";
+        private const string I18N_PLAYERS_ONLY = "PlayersOnly";
         #endregion variables
 
         #region Data
@@ -93,49 +102,53 @@ namespace Oxide.Plugins
         {
             lang.RegisterMessages(new Dictionary<string, string>
             {
-                ["NoPermissionGiveTaser"] = "You are not allowed to spawn a taser",
-                ["PlayerNameNotExistent"] = "The name matches no player",
-                ["GaveTaserTo"] = "Gave taser to {0}",
-                ["GaveTaserToYou"] = "Gave taser to you",
-                ["CouldNotGive"] = "Could not spawn a taser",
-                ["Taser"] = "Taser"
+                [I18N_NO_PLAYER_FOR_NAME] = "No players found with name or ID '{0}'",
+                [I18N_MULTIPLE_PLAYERS_FOR_NAME] = "Multiple players were found, please specify: {0}",
+                [I18N_GAVE_TASER_TO] = "Gave taser to {0}",
+                [I18N_GAVE_TASER_TO_YOU] = "Gave taser to you",
+                [I18N_COULD_NOT_SPAWN] = "Could not spawn a taser",
+                [I18N_TASER] = "Taser",
+                [I18N_PLAYERS_ONLY] = "Command '{0}' can only be used by a player"
             }, this);
         }
         #endregion localization
 
-        #region chatommands
-        [ChatCommand("givetaser")]
-        private void GiveTaser(BasePlayer aPlayer, string aCommand, string[] someArgs)
+        #region commands
+        [Command("givetaser"), Permission(PERMISSION_GIVETASER)]
+        private void GiveTaser(IPlayer aPlayer, string aCommand, string[] someArgs)
         {
-            if (!permission.UserHasPermission(aPlayer.UserIDString, PERMISSION_GIVETASER))
-            {
-                aPlayer.ChatMessage(Lang("NoPermissionGiveTaser", aPlayer.UserIDString));
-                return;
-            }
-
-            BasePlayer thePlayer = someArgs.Length > 0 ? FindPlayerByName(aPlayer, someArgs[0]) : aPlayer;
-            if (!thePlayer)
+            IPlayer thePlayer = someArgs.Length > 0 ? FindPlayer(someArgs[0], aPlayer) : aPlayer;
+            if (thePlayer == null)
             {
                 return;
             }
-            Item theItem = GiveItemToPlayer(thePlayer, config.ItemNailgun);
+            if (thePlayer.IsServer)
+            {
+                Message(aPlayer, I18N_PLAYERS_ONLY, aCommand);
+                return;
+            }
+            BasePlayer thePlayerEntity = thePlayer.Object as BasePlayer;
+            if (!thePlayerEntity)
+            {
+                return;
+            }
+            Item theItem = GiveItemToPlayer(thePlayerEntity, config.ItemNailgun);
             if (theItem == null)
             {
-                aPlayer.ChatMessage(Lang("CouldNotGive", aPlayer.UserIDString));
+                Message(aPlayer, I18N_COULD_NOT_SPAWN);
                 return;
-
             }
             EnableTaserBehaviour(theItem.GetHeldEntity().GetComponent<BaseProjectile>());
             if (thePlayer == aPlayer)
             {
-                aPlayer.ChatMessage(Lang("GaveTaserToYou", aPlayer.UserIDString));
+                Message(aPlayer, I18N_GAVE_TASER_TO_YOU);
             }
             else
             {
-                aPlayer.ChatMessage(Lang("GaveTaserTo", aPlayer.UserIDString, thePlayer.displayName));
+                Message(aPlayer, I18N_GAVE_TASER_TO, thePlayer.Name);
             }
         }
-        #endregion chatommands
+        #endregion commands
 
         #region hooks
         private void Unload()
@@ -176,8 +189,6 @@ namespace Oxide.Plugins
 
         private void OnServerInitialized(bool anInitialFlag)
         {
-            permission.RegisterPermission(PERMISSION_GIVETASER, this);
-
             // Readd Behaviour
             DataContainer thePersistentData = Interface.Oxide.DataFileSystem.ReadObject<DataContainer>(Name);
             foreach (uint eachNailgunID in thePersistentData.NailgunIDs)
@@ -247,7 +258,7 @@ namespace Oxide.Plugins
         {
             if (anItem.GetHeldEntity()?.GetComponent<TaserController>())
             {
-                anItem.name = Lang("Taser");
+                anItem.name = GetText(I18N_TASER, aPlayer.UserIDString);
             }
             return null;
         }
@@ -274,7 +285,7 @@ namespace Oxide.Plugins
             Item theItem = aBaseProjectile.GetItem();
             if (theItem != null)
             {
-                theItem.name = Lang("Taser");
+                theItem.name = GetText(I18N_TASER, theItem.GetOwnerPlayer()?.UserIDString);
             }
             aBaseProjectile.canUnloadAmmo = false;
             aBaseProjectile.primaryMagazine.contents = 1;
@@ -308,19 +319,35 @@ namespace Oxide.Plugins
         #endregion methods
 
         #region helpers
-
-        private BasePlayer FindPlayerByName(BasePlayer aPlayer, string aName)
+        private IPlayer FindPlayer(string aPlayerNameOrId, IPlayer aPlayer)
         {
-            BasePlayer thePlayer = Player.Find(aName);
-            if (!thePlayer)
+            IPlayer[] theFoundPlayers = players.FindPlayers(aPlayerNameOrId).ToArray();
+            if (theFoundPlayers.Length > 1)
             {
-                aPlayer.ChatMessage(Lang("PlayerNameNotExistent", aPlayer.UserIDString));
+                Message(aPlayer, I18N_MULTIPLE_PLAYERS_FOR_NAME, string.Join(", ", theFoundPlayers.Select(p => p.Name).Take(10).ToArray()).Truncate(60));
                 return null;
             }
-            return thePlayer;
+
+            IPlayer theFoundPlayer = theFoundPlayers.Length == 1 ? theFoundPlayers[0] : null;
+            if (theFoundPlayer == null)
+            {
+                Message(aPlayer, I18N_NO_PLAYER_FOR_NAME, aPlayerNameOrId);
+                return null;
+            }
+
+            return theFoundPlayer;
         }
 
-        private string Lang(string aKey, string aUserID = null, params object[] someArgs) => string.Format(lang.GetMessage(aKey, this, aUserID), someArgs);
+        private string GetText(string aKey, string aPlayerId = null, params object[] someArgs) => string.Format(lang.GetMessage(aKey, this, aPlayerId), someArgs);
+
+        private void Message(IPlayer aPlayer, string anI18nKey, params object[] someArgs)
+        {
+            if (aPlayer.IsConnected)
+            {
+                string theText = GetText(anI18nKey, aPlayer.Id, someArgs);
+                aPlayer.Reply(theText != anI18nKey ? theText : anI18nKey);
+            }
+        }
         #endregion helpers
 
         #region controllers
