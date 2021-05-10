@@ -1,19 +1,22 @@
 ﻿using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
+using Rust;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "2.0.0")]
+    [Info("Electric Taser", "ZockiRR", "2.1.0")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : CovalencePlugin
     {
 
         #region variables
         private const string PERMISSION_GIVETASER = "electrictaser.givetaser";
+        private const string PERMISSION_TASENPC = "electrictaser.tasenpc";
+        private const string PERMISSION_USETASER = "electrictaser.usetaser";
 
         private const string I18N_NO_PLAYER_FOR_NAME = "NoPlayerForName";
         private const string I18N_MULTIPLE_PLAYERS_FOR_NAME = "MultiplePlayersForName";
@@ -22,6 +25,7 @@ namespace Oxide.Plugins
         private const string I18N_COULD_NOT_SPAWN = "CouldNotSpawn";
         private const string I18N_TASER = "Taser";
         private const string I18N_PLAYERS_ONLY = "PlayersOnly";
+        private const string I18N_CANNOT_MOVE_ITEM = "CannotMoveItem";
         #endregion variables
 
         #region Data
@@ -48,6 +52,18 @@ namespace Oxide.Plugins
 
             [JsonProperty("TaserDamage")]
             public float TaserDamage = 0f;
+
+            [JsonProperty("NoUsePermissionDamage")]
+            public float NoUsePermissionDamage = 20f;
+
+            [JsonProperty("InstantKillsNPCs")]
+            public bool InstantKillsNPCs = false;
+
+            [JsonProperty("NPCBeltLocked")]
+            public bool NPCBeltLocked = true;
+
+            [JsonProperty("NPCWearLocked")]
+            public bool NPCWearLocked = true;
 
             [JsonProperty("ItemNailgun")]
             public string ItemNailgun = "pistol.nailgun";
@@ -108,7 +124,8 @@ namespace Oxide.Plugins
                 [I18N_GAVE_TASER_TO_YOU] = "Gave taser to you",
                 [I18N_COULD_NOT_SPAWN] = "Could not spawn a taser",
                 [I18N_TASER] = "Taser",
-                [I18N_PLAYERS_ONLY] = "Command '{0}' can only be used by a player"
+                [I18N_PLAYERS_ONLY] = "Command '{0}' can only be used by a player",
+                [I18N_CANNOT_MOVE_ITEM] = "Cannot move item!"
             }, this);
         }
         #endregion localization
@@ -189,6 +206,9 @@ namespace Oxide.Plugins
 
         private void OnServerInitialized(bool anInitialFlag)
         {
+            permission.RegisterPermission(PERMISSION_TASENPC, this);
+            permission.RegisterPermission(PERMISSION_USETASER, this);
+
             // Readd Behaviour
             DataContainer thePersistentData = Interface.Oxide.DataFileSystem.ReadObject<DataContainer>(Name);
             foreach (uint eachNailgunID in thePersistentData.NailgunIDs)
@@ -203,7 +223,16 @@ namespace Oxide.Plugins
 
         private void OnWeaponFired(BaseProjectile aProjectile, BasePlayer aPlayer, ItemModProjectile aMod, ProtoBuf.ProjectileShoot aProjectileProtoBuf)
         {
-            aProjectile.GetComponent<TaserController>()?.ResetTaser();
+            TaserController theController = aProjectile.GetComponent<TaserController>();
+            if (theController)
+            {
+                theController.ResetTaser();
+                if (!permission.UserHasPermission(aPlayer.UserIDString, PERMISSION_USETASER))
+                {
+                    Effect.server.Run(config.PrefabShock, aProjectile, StringPool.Get(aProjectile.MuzzleTransform.name), aProjectile.MuzzleTransform.localPosition, Vector3.zero);
+                    aPlayer.OnAttacked(new HitInfo(aPlayer, aPlayer, DamageType.ElectricShock, config.NoUsePermissionDamage, aPlayer.transform.position + aPlayer.transform.forward * 1f));
+                }
+            }
         }
 
         private object CanCreateWorldProjectile(HitInfo anInfo, ItemDefinition anItemDefinition)
@@ -224,6 +253,12 @@ namespace Oxide.Plugins
             aHitInfo.damageTypes.Clear();
             aHitInfo.DoHitEffects = false;
             aHitInfo.DoDecals = false;
+
+            if (aHitInfo.InitiatorPlayer && !permission.UserHasPermission(aHitInfo.InitiatorPlayer.UserIDString, PERMISSION_USETASER))
+            {
+                return false;
+            }
+
             float theDistance = !aHitInfo.IsProjectile() ? Vector3.Distance(aHitInfo.PointStart, aHitInfo.HitPositionWorld) : aHitInfo.ProjectileDistance;
             if (config.TaserDistance > 0f && theDistance > config.TaserDistance)
             {
@@ -231,10 +266,33 @@ namespace Oxide.Plugins
                 return false;
             }
             Effect.server.Run(config.PrefabShock, anEntity, aHitInfo.HitBone, aHitInfo.HitPositionLocal, aHitInfo.HitNormalLocal);
-            aHitInfo.damageTypes.Add(Rust.DamageType.ElectricShock, config.TaserDamage);
+            aHitInfo.damageTypes.Add(DamageType.ElectricShock, config.TaserDamage);
             BasePlayer thePlayer = anEntity?.GetComponent<BasePlayer>();
             if (thePlayer)
             {
+                if (thePlayer.IsNpc)
+                {
+                    if (aHitInfo.InitiatorPlayer && !permission.UserHasPermission(aHitInfo.InitiatorPlayer.UserIDString, PERMISSION_TASENPC))
+                    {
+                        return null;
+                    }
+
+                    if (config.InstantKillsNPCs)
+                    {
+                        thePlayer.Die(aHitInfo);
+                        return null;
+                    }
+
+                    if (config.NPCBeltLocked)
+                    {
+                        thePlayer.inventory.containerBelt.SetLocked(true);
+                    }
+                    if (config.NPCWearLocked)
+                    {
+                        thePlayer.inventory.containerWear.SetLocked(true);
+                    }
+                }
+
                 ShockedController theController = thePlayer.GetComponent<ShockedController>();
                 if (!theController)
                 {
@@ -242,6 +300,37 @@ namespace Oxide.Plugins
                     theController.Config = config;
                 }
                 NextFrame(() => theController.Shock(aHitInfo));
+            }
+            return null;
+        }
+
+        private object CanMoveItem(Item anItem, PlayerInventory aPlayerLoot, uint aTargetContainer, int aTargetSlot, int anAmount)
+        {
+            if (anItem.GetRootContainer().IsLocked() && (anItem.GetOwnerPlayer()?.GetComponent<ShockedController>()?.IsShocked ?? false))
+            {
+                Message(aPlayerLoot.GetComponentInParent<BasePlayer>(), I18N_CANNOT_MOVE_ITEM);
+                return ItemContainer.CanAcceptResult.CannotAccept;
+            }
+            return null;
+        }
+
+        private object OnPlayerRecover(BasePlayer aPlayer)
+        {
+            ShockedController theController = aPlayer.GetComponent<ShockedController>();
+            if (theController)
+            {
+               if (aPlayer.IsNpc)
+                {
+                    if (aPlayer.inventory.containerBelt.IsLocked())
+                    {
+                        aPlayer.inventory.containerBelt.SetLocked(false);
+                    }
+                    if (aPlayer.inventory.containerWear.IsLocked())
+                    {
+                        aPlayer.inventory.containerWear.SetLocked(false);
+                    }
+                }
+                theController.IsShocked = false;
             }
             return null;
         }
@@ -348,6 +437,15 @@ namespace Oxide.Plugins
                 aPlayer.Reply(theText != anI18nKey ? theText : anI18nKey);
             }
         }
+
+        private void Message(BasePlayer aPlayer, string anI18nKey, params object[] someArgs)
+        {
+            if (aPlayer.IsConnected)
+            {
+                string theText = GetText(anI18nKey, aPlayer.UserIDString, someArgs);
+                aPlayer.ChatMessage(theText != anI18nKey ? theText : anI18nKey);
+            }
+        }
         #endregion helpers
 
         #region controllers
@@ -381,6 +479,7 @@ namespace Oxide.Plugins
         private class ShockedController : FacepunchBehaviour
         {
             public Configuration Config { get; set; }
+            public bool IsShocked { get; set; }
             private BasePlayer Player
             {
                 get
@@ -400,6 +499,7 @@ namespace Oxide.Plugins
                 Effect.server.Run(Config.PrefabScream, Player.transform.position);
                 if (!Player.IsSleeping())
                 {
+                    IsShocked = true;
                     Player.StartWounded(aHitInfo?.InitiatorPlayer, aHitInfo);
                     Player.woundedStartTime = Time.realtimeSinceStartup;
                     Player.woundedDuration = Config.TaserShockDuration + 5f;
