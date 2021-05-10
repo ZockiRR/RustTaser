@@ -8,13 +8,14 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "2.1.0")]
+    [Info("Electric Taser", "ZockiRR", "2.0.0")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : CovalencePlugin
     {
 
         #region variables
         private const string PERMISSION_GIVETASER = "electrictaser.givetaser";
+        private const string PERMISSION_REMOVEALLTASERS = "electrictaser.removealltasers";
         private const string PERMISSION_TASENPC = "electrictaser.tasenpc";
         private const string PERMISSION_USETASER = "electrictaser.usetaser";
 
@@ -26,6 +27,9 @@ namespace Oxide.Plugins
         private const string I18N_TASER = "Taser";
         private const string I18N_PLAYERS_ONLY = "PlayersOnly";
         private const string I18N_CANNOT_MOVE_ITEM = "CannotMoveItem";
+        private const string I18N_NOT_ALLOWED_TO_USE = "NotAllowedToUse";
+        private const string I18N_REMOVED_ALL_TASERS = "RemovedAllTasers";
+
         #endregion variables
 
         #region Data
@@ -125,13 +129,15 @@ namespace Oxide.Plugins
                 [I18N_COULD_NOT_SPAWN] = "Could not spawn a taser",
                 [I18N_TASER] = "Taser",
                 [I18N_PLAYERS_ONLY] = "Command '{0}' can only be used by a player",
-                [I18N_CANNOT_MOVE_ITEM] = "Cannot move item!"
+                [I18N_CANNOT_MOVE_ITEM] = "Cannot move item!",
+                [I18N_NOT_ALLOWED_TO_USE] = "You can't use the taser!",
+                [I18N_REMOVED_ALL_TASERS] = "Removed all tasers from the server"
             }, this);
         }
         #endregion localization
 
         #region commands
-        [Command("givetaser"), Permission(PERMISSION_GIVETASER)]
+        [Command("givetaser", "givetazer"), Permission(PERMISSION_GIVETASER)]
         private void GiveTaser(IPlayer aPlayer, string aCommand, string[] someArgs)
         {
             IPlayer thePlayer = someArgs.Length > 0 ? FindPlayer(someArgs[0], aPlayer) : aPlayer;
@@ -164,6 +170,33 @@ namespace Oxide.Plugins
             {
                 Message(aPlayer, I18N_GAVE_TASER_TO, thePlayer.Name);
             }
+        }
+
+        [Command("removealltasers", "removealltazers"), Permission(PERMISSION_REMOVEALLTASERS)]
+        private void RemoveAllTasers(IPlayer aPlayer, string aCommand, string[] someArgs)
+        {
+            foreach (DroppedItem eachItem in BaseNetworkable.serverEntities.OfType<DroppedItem>())
+            {
+                Item theItem = eachItem.GetItem();
+                if (theItem.GetHeldEntity()?.GetComponent<TaserController>())
+                {
+                    theItem.Remove();
+                }
+            }
+
+            foreach (BaseProjectile eachProjectile in BaseNetworkable.serverEntities.OfType<BaseProjectile>())
+            {
+                if (eachProjectile.GetComponent<TaserController>())
+                {
+                    eachProjectile.GetItem()?.Remove();
+                    if (!eachProjectile.IsDestroyed)
+                    {
+                        eachProjectile.Kill();
+                    }
+                }
+            }
+
+            Message(aPlayer, I18N_REMOVED_ALL_TASERS);
         }
         #endregion commands
 
@@ -231,6 +264,7 @@ namespace Oxide.Plugins
                 {
                     Effect.server.Run(config.PrefabShock, aProjectile, StringPool.Get(aProjectile.MuzzleTransform.name), aProjectile.MuzzleTransform.localPosition, Vector3.zero);
                     aPlayer.OnAttacked(new HitInfo(aPlayer, aPlayer, DamageType.ElectricShock, config.NoUsePermissionDamage, aPlayer.transform.position + aPlayer.transform.forward * 1f));
+                    Message(aPlayer, I18N_NOT_ALLOWED_TO_USE);
                 }
             }
         }
