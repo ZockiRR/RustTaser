@@ -37,9 +37,9 @@ Example: /removealltazers
 
 ## Permissions
  - `electrictaser.givetaser` -- Allows the use of the givetaser/givetazer commands 
- - `electrictaser.removealltasers` --  Allow the use of the removealltasers/removealltazers commands
+ - `electrictaser.removealltasers` --  Allows the use of the removealltasers/removealltazers commands
  - `electrictaser.tasenpc` -- Allows the player to tase NPCs, which are player like (for example Scientists)
- - `electrictaser.usetaser` -- Allow the player to use the taser in general
+ - `electrictaser.usetaser` -- Allows the player to use the taser in general
 
 ## Configuration
 ```
