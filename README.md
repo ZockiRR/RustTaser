@@ -2,7 +2,7 @@
 When entering the chat command the named player or if no name given yourself is granted an item named as Taser. This item can normally be dropped and will function as Taser for everyone else. This is the main difference to the [Taser](https://umod.org/plugins/taser), where it depends on permission and ammo type rather then a chat command.
 The taser has one charge. After using that charge the taser needs a specific amount of time to recharge. If a player in range is hit by the taser he immediatly gets into the wounded state and will get back up again after a specific amount of time or when another player helps him in the normal way. Unless the taser damage is changed to something > 0, the taser is unable to kill a player. If the player doesn't have the permission to use the taser he won't fire the taser, but will receive a specified amount of damage. If everyone should have the permission to use the taser you may add the permission to the default group like `oxide.grant group default electrictaser.usetaser`.
 
-## Chat/Console Commands
+## Commands
 ### GiveTaser
 This will give the specified player a taser or if no playername was given yourself.
 ```

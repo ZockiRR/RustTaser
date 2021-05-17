@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "2.0.0")]
+    [Info("Electric Taser", "ZockiRR", "2.0.1")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : CovalencePlugin
     {
@@ -290,14 +290,14 @@ namespace Oxide.Plugins
 
             if (aHitInfo.InitiatorPlayer && !permission.UserHasPermission(aHitInfo.InitiatorPlayer.UserIDString, PERMISSION_USETASER))
             {
-                return false;
+                return true;
             }
 
             float theDistance = !aHitInfo.IsProjectile() ? Vector3.Distance(aHitInfo.PointStart, aHitInfo.HitPositionWorld) : aHitInfo.ProjectileDistance;
             if (config.TaserDistance > 0f && theDistance > config.TaserDistance)
             {
                 aHitInfo.DidHit = false;
-                return false;
+                return true;
             }
             Effect.server.Run(config.PrefabShock, anEntity, aHitInfo.HitBone, aHitInfo.HitPositionLocal, aHitInfo.HitNormalLocal);
             aHitInfo.damageTypes.Add(DamageType.ElectricShock, config.TaserDamage);
@@ -340,7 +340,7 @@ namespace Oxide.Plugins
 
         private object CanMoveItem(Item anItem, PlayerInventory aPlayerLoot, uint aTargetContainer, int aTargetSlot, int anAmount)
         {
-            if (anItem.GetRootContainer().IsLocked() && (anItem.GetOwnerPlayer()?.GetComponent<ShockedController>()?.IsShocked ?? false))
+            if (anItem.GetRootContainer()?.IsLocked() ?? false && (anItem.GetOwnerPlayer()?.GetComponent<ShockedController>()?.IsShocked ?? false))
             {
                 Message(aPlayerLoot.GetComponentInParent<BasePlayer>(), I18N_CANNOT_MOVE_ITEM);
                 return ItemContainer.CanAcceptResult.CannotAccept;
