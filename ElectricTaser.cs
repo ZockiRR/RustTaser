@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "2.0.1")]
+    [Info("Electric Taser", "ZockiRR", "2.0.2")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : CovalencePlugin
     {
@@ -246,7 +246,7 @@ namespace Oxide.Plugins
             DataContainer thePersistentData = Interface.Oxide.DataFileSystem.ReadObject<DataContainer>(Name);
             foreach (uint eachNailgunID in thePersistentData.NailgunIDs)
             {
-                BaseProjectile theTaser = BaseNetworkable.serverEntities.Find(eachNailgunID).GetComponent<BaseProjectile>();
+                BaseProjectile theTaser = BaseNetworkable.serverEntities.Find(eachNailgunID)?.GetComponent<BaseProjectile>();
                 if (theTaser)
                 {
                     EnableTaserBehaviour(theTaser);
@@ -534,8 +534,7 @@ namespace Oxide.Plugins
                 if (!Player.IsSleeping())
                 {
                     IsShocked = true;
-                    Player.StartWounded(aHitInfo?.InitiatorPlayer, aHitInfo);
-                    Player.woundedStartTime = Time.realtimeSinceStartup;
+                    Player.GoToIncapacitated(aHitInfo);
                     Player.woundedDuration = Config.TaserShockDuration + 5f;
                     CancelInvoke(StopWounded);
                     Invoke(StopWounded, Config.TaserShockDuration);
