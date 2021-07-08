@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "2.0.2")]
+    [Info("Electric Taser", "ZockiRR", "2.0.3")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : CovalencePlugin
     {
@@ -534,7 +534,9 @@ namespace Oxide.Plugins
                 if (!Player.IsSleeping())
                 {
                     IsShocked = true;
+                    float theHealth = Player.health;
                     Player.GoToIncapacitated(aHitInfo);
+                    Player.health = theHealth;
                     Player.woundedDuration = Config.TaserShockDuration + 5f;
                     CancelInvoke(StopWounded);
                     Invoke(StopWounded, Config.TaserShockDuration);
