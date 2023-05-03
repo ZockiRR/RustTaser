@@ -8,12 +8,12 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "2.0.3")]
+    [Info("Electric Taser", "ZockiRR", "2.0.4")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : CovalencePlugin
     {
 
-        #region variables
+        #region Variables
         private const string PERMISSION_GIVETASER = "electrictaser.givetaser";
         private const string PERMISSION_REMOVEALLTASERS = "electrictaser.removealltasers";
         private const string PERMISSION_TASENPC = "electrictaser.tasenpc";
@@ -30,13 +30,13 @@ namespace Oxide.Plugins
         private const string I18N_NOT_ALLOWED_TO_USE = "NotAllowedToUse";
         private const string I18N_REMOVED_ALL_TASERS = "RemovedAllTasers";
 
-        #endregion variables
+        #endregion Variables
 
         #region Data
         private class DataContainer
         {
             // Set Nailgun.net.ID
-            public HashSet<uint> NailgunIDs = new HashSet<uint>();
+            public HashSet<NetworkableId> NailgunIDs = new HashSet<NetworkableId>();
         }
         #endregion Data
 
@@ -213,9 +213,9 @@ namespace Oxide.Plugins
                 }
             }
 
-            foreach (BasePlayer eachProjectile in BaseNetworkable.serverEntities.OfType<BasePlayer>())
+            foreach (BasePlayer eachPlayer in BaseNetworkable.serverEntities.OfType<BasePlayer>())
             {
-                ShockedController theController = eachProjectile.GetComponent<ShockedController>();
+                ShockedController theController = eachPlayer.GetComponent<ShockedController>();
                 if (theController)
                 {
                     UnityEngine.Object.Destroy(theController);
@@ -244,7 +244,7 @@ namespace Oxide.Plugins
 
             // Readd Behaviour
             DataContainer thePersistentData = Interface.Oxide.DataFileSystem.ReadObject<DataContainer>(Name);
-            foreach (uint eachNailgunID in thePersistentData.NailgunIDs)
+            foreach (NetworkableId eachNailgunID in thePersistentData.NailgunIDs)
             {
                 BaseProjectile theTaser = BaseNetworkable.serverEntities.Find(eachNailgunID)?.GetComponent<BaseProjectile>();
                 if (theTaser)
