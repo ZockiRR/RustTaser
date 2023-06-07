@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Electric Taser", "ZockiRR", "2.0.4")]
+    [Info("Electric Taser", "ZockiRR", "2.0.5")]
     [Description("Gives players the ability to spawn a taser")]
     class ElectricTaser : CovalencePlugin
     {
@@ -36,7 +36,7 @@ namespace Oxide.Plugins
         private class DataContainer
         {
             // Set Nailgun.net.ID
-            public HashSet<NetworkableId> NailgunIDs = new HashSet<NetworkableId>();
+            public HashSet<ulong> NailgunIDs = new HashSet<ulong>();
         }
         #endregion Data
 
@@ -231,7 +231,7 @@ namespace Oxide.Plugins
                 TaserController theController = eachTaser.GetComponent<TaserController>();
                 if (theController)
                 {
-                    thePersistentData.NailgunIDs.Add(eachTaser.net.ID);
+                    thePersistentData.NailgunIDs.Add(eachTaser.net.ID.Value);
                 }
             }
             Interface.Oxide.DataFileSystem.WriteObject(Name, thePersistentData);
@@ -244,9 +244,9 @@ namespace Oxide.Plugins
 
             // Readd Behaviour
             DataContainer thePersistentData = Interface.Oxide.DataFileSystem.ReadObject<DataContainer>(Name);
-            foreach (NetworkableId eachNailgunID in thePersistentData.NailgunIDs)
+            foreach (ulong eachNailgunID in thePersistentData.NailgunIDs)
             {
-                BaseProjectile theTaser = BaseNetworkable.serverEntities.Find(eachNailgunID)?.GetComponent<BaseProjectile>();
+                BaseProjectile theTaser = BaseNetworkable.serverEntities.Find(new NetworkableId(eachNailgunID))?.GetComponent<BaseProjectile>();
                 if (theTaser)
                 {
                     EnableTaserBehaviour(theTaser);
@@ -271,7 +271,8 @@ namespace Oxide.Plugins
 
         private object CanCreateWorldProjectile(HitInfo anInfo, ItemDefinition anItemDefinition)
         {
-            if (anInfo.Weapon.GetComponent<TaserController>()) {
+            if (anInfo.Weapon.GetComponent<TaserController>())
+            {
                 return false;
             }
             return null;
@@ -353,7 +354,7 @@ namespace Oxide.Plugins
             ShockedController theController = aPlayer.GetComponent<ShockedController>();
             if (theController)
             {
-               if (aPlayer.IsNpc)
+                if (aPlayer.IsNpc)
                 {
                     if (aPlayer.inventory.containerBelt.IsLocked())
                     {
